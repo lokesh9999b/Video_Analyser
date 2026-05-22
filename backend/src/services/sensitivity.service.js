@@ -19,6 +19,21 @@ const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 const logger = require('../utils/logger');
 
+let tf;
+let nsfwjs;
+let nsfwModel = null; // Cached model — loaded once, reused for all videos
+let modelLoadFailed = false; // Prevents retrying after a failed load
+
+// Attempt to load TensorFlow (only works on Linux/Render, not Windows without VS Build Tools)
+try {
+  tf = require('@tensorflow/tfjs-node');
+  nsfwjs = require('nsfwjs');
+  logger.info('TensorFlow.js loaded successfully — real AI detection enabled.');
+} catch (e) {
+  logger.warn(`TensorFlow.js failed to load: ${e.message}. Falling back to simulator.`);
+  modelLoadFailed = true;
+}
+
 // Set bundled FFmpeg/FFprobe paths (works on Render, Heroku, etc.)
 ffmpeg.setFfmpegPath(ffmpegPath);
 ffmpeg.setFfprobePath(ffprobePath);
@@ -38,6 +53,19 @@ const analyseVideo = async (videoPath, duration, onProgress) => {
   const framesDir = path.join(path.dirname(videoPath), '..', 'temp_frames');
 
   try {
+    // Load NSFWJS model into memory on first run (cached for subsequent videos)
+    if (!nsfwModel && !modelLoadFailed) {
+      onProgress(5, 'Loading AI content moderation model...');
+      logger.info('Loading NSFWJS model into memory (first upload)...');
+      try {
+        nsfwModel = await nsfwjs.load();
+        logger.info('✅ NSFWJS model loaded successfully.');
+      } catch (modelErr) {
+        logger.error(`Failed to load NSFWJS model: ${modelErr.message}`);
+        modelLoadFailed = true;
+      }
+    }
+
     // Create temporary directory for extracted frames
     if (!fs.existsSync(framesDir)) {
       fs.mkdirSync(framesDir, { recursive: true });
@@ -144,37 +172,68 @@ const extractFrames = (videoPath, outputDir, interval) => {
 /**
  * Classify a single frame for sensitive content.
  *
- * This is a SIMULATED classifier for demonstration purposes.
- * It generates realistic-looking scores based on randomisation.
- *
- * To use NSFWJS (real classifier), replace this function with:
- *   const nsfwjs = require('nsfwjs');
- *   const tf = require('@tensorflow/tfjs-node');
- *   const model = await nsfwjs.load();
- *   const image = await tf.node.decodeImage(fs.readFileSync(framePath));
- *   const predictions = await model.classify(image);
- *   image.dispose();
+ * Uses NSFWJS (real AI) when TensorFlow is available (Linux/Render).
+ * Falls back to a simulator when TensorFlow cannot load (Windows without VS Build Tools).
  *
  * @param {string} framePath - Path to the frame image
  * @returns {Promise<object>} - { score, categories }
  */
 const classifyFrame = async (framePath) => {
-  // Simulated analysis — generates a low sensitivity score (most content is safe)
-  // In a real implementation, this would call NSFWJS or a cloud vision API
-  const baseScore = Math.random() * 0.3; // Most frames will score low (safe)
+  // --- REAL AI PATH (Render/Linux) ---
+  if (nsfwModel && tf) {
+    let imageTensor = null;
+    try {
+      const imageBuffer = fs.readFileSync(framePath);
+      imageTensor = tf.node.decodeImage(imageBuffer, 3);
+      const predictions = await nsfwModel.classify(imageTensor);
+
+      let explicitProb = 0;
+      let suggestiveProb = 0;
+      let safeProb = 0;
+
+      predictions.forEach((p) => {
+        if (p.className === 'Porn' || p.className === 'Hentai') {
+          explicitProb += p.probability;
+        } else if (p.className === 'Sexy') {
+          suggestiveProb += p.probability;
+        } else {
+          safeProb += p.probability;
+        }
+      });
+
+      // Explicit content weighted heavier than suggestive
+      const score = explicitProb + (suggestiveProb * 0.5);
+
+      return {
+        score,
+        categories: {
+          safe: safeProb,
+          suggestive: suggestiveProb,
+          violent: 0, // NSFWJS does not detect violence
+          explicit: explicitProb,
+        },
+      };
+    } catch (error) {
+      logger.error(`Frame classification error: ${error.message}`);
+      return { score: 0, categories: { safe: 1, suggestive: 0, violent: 0, explicit: 0 } };
+    } finally {
+      // CRITICAL: Dispose tensor to prevent memory leaks
+      if (imageTensor) imageTensor.dispose();
+    }
+  }
+
+  // --- FALLBACK SIMULATOR PATH (Windows/local dev) ---
+  logger.debug('Using simulated classifier (TensorFlow not available).');
+  const baseScore = Math.random() * 0.3;
   const noise = Math.random() * 0.1;
-
-  // Simulate category scores
-  const categories = {
-    safe: 1 - baseScore - noise,
-    suggestive: baseScore * 0.5,
-    violent: baseScore * 0.3,
-    explicit: baseScore * 0.2,
-  };
-
   return {
     score: baseScore + noise,
-    categories,
+    categories: {
+      safe: 1 - baseScore - noise,
+      suggestive: baseScore * 0.5,
+      violent: baseScore * 0.3,
+      explicit: baseScore * 0.2,
+    },
   };
 };
 
