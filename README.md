@@ -92,7 +92,50 @@ sequenceDiagram
 
 ---
 
+##  Screenshots
+
+### Authentication & Registration Flow
+
+| Login | Register Organisation |
+|:---:|:---:|
+| ![Login Page](./docs/screenshots/login.png) | ![Org Registration](./docs/screenshots/org_register.png) |
+
+| Join Existing Organisation | Request Submitted |
+|:---:|:---:|
+| ![User Registration](./docs/screenshots/user_register.png) | ![Join Request Success](./docs/screenshots/join_request_success.png) |
+
+---
+
+### Dashboard & Admin Flow
+
+| Dashboard (Active) | Dashboard (First Login) |
+|:---:|:---:|
+| ![Dashboard Active](./docs/screenshots/dashboard_active.png) | ![Dashboard Empty](./docs/screenshots/dashboard_empty.png) |
+
+| Manage Users (Admin) | Pending Approvals |
+|:---:|:---:|
+| ![Admin Users](./docs/screenshots/admin_users.png) | ![Pending Approvals](./docs/screenshots/pending_approvals.png) |
+
+---
+
+### Video Upload & Processing Flow
+
+| Upload Page | Processing in Progress |
+|:---:|:---:|
+| ![Upload Page](./docs/screenshots/upload_page.png) | ![Upload Progress](./docs/screenshots/upload_progress.png) |
+
+---
+
+### Video Library & Player
+
+| Video Library | Video Details & Player |
+|:---:|:---:|
+| ![Video Library](./docs/screenshots/video_library.png) | ![Video Details](./docs/screenshots/video_details.png) |
+
+---
+
 ##  User Manual
+
 
 ### User Roles (RBAC)
 Pulse uses a strictly enforced Role-Based Access Control system isolated by `organisation`.
