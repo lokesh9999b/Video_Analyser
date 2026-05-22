@@ -94,45 +94,90 @@ sequenceDiagram
 
 ##  Screenshots
 
-### Authentication & Registration Flow
-
-| Login | Register Organisation |
-|:---:|:---:|
-| ![Login Page](./docs/screenshots/login.png) | ![Org Registration](./docs/screenshots/org_register.png) |
-
-| Join Existing Organisation | Request Submitted |
-|:---:|:---:|
-| ![User Registration](./docs/screenshots/user_register.png) | ![Join Request Success](./docs/screenshots/join_request_success.png) |
+###  1. Login Page
+<p align="center">
+  <img src="./docs/screenshots/login.png" alt="Login Page" width="85%"/>
+</p>
 
 ---
 
-### Dashboard & Admin Flow
-
-| Dashboard (Active) | Dashboard (First Login) |
-|:---:|:---:|
-| ![Dashboard Active](./docs/screenshots/dashboard_active.png) | ![Dashboard Empty](./docs/screenshots/dashboard_empty.png) |
-
-| Manage Users (Admin) | Pending Approvals |
-|:---:|:---:|
-| ![Admin Users](./docs/screenshots/admin_users.png) | ![Pending Approvals](./docs/screenshots/pending_approvals.png) |
+###  2. Register an Organisation (Create New Org + Admin Account)
+<p align="center">
+  <img src="./docs/screenshots/org_register.png" alt="Organisation Registration" width="85%"/>
+</p>
 
 ---
 
-### Video Upload & Processing Flow
+###  3. Join an Existing Organisation (User Registration)
+<p align="center">
+  <img src="./docs/screenshots/user_register.png" alt="User Registration" width="85%"/>
+</p>
 
-| Upload Page | Processing in Progress |
-|:---:|:---:|
-| ![Upload Page](./docs/screenshots/upload_page.png) | ![Upload Progress](./docs/screenshots/upload_progress.png) |
+---
+
+###  4. Join Request Submitted (Waiting for Admin Approval)
+<p align="center">
+  <img src="./docs/screenshots/join_request_success.png" alt="Join Request Submitted" width="85%"/>
+</p>
 
 ---
 
-### Video Library & Player
-
-| Video Library | Video Details & Player |
-|:---:|:---:|
-| ![Video Library](./docs/screenshots/video_library.png) | ![Video Details](./docs/screenshots/video_details.png) |
+###  5. Dashboard (Active — with Videos)
+<p align="center">
+  <img src="./docs/screenshots/dashboard_active.png" alt="Active Dashboard" width="85%"/>
+</p>
 
 ---
+
+###  6. Dashboard (First Login — No Videos Yet)
+<p align="center">
+  <img src="./docs/screenshots/dashboard_empty.png" alt="Empty Dashboard" width="85%"/>
+</p>
+
+---
+
+###  7. Admin Panel — Manage Users
+<p align="center">
+  <img src="./docs/screenshots/admin_users.png" alt="Admin User Management" width="85%"/>
+</p>
+
+---
+
+###  8. Admin Panel — Pending Approval Requests
+<p align="center">
+  <img src="./docs/screenshots/pending_approvals.png" alt="Pending Approvals" width="85%"/>
+</p>
+
+---
+
+###  9. Upload Video Page
+<p align="center">
+  <img src="./docs/screenshots/upload_page.png" alt="Upload Video" width="85%"/>
+</p>
+
+---
+
+###  10. Video Processing in Progress (Real-Time Progress Bar)
+<p align="center">
+  <img src="./docs/screenshots/upload_progress.png" alt="Video Processing" width="85%"/>
+</p>
+
+---
+
+###  11. Video Library
+<p align="center">
+  <img src="./docs/screenshots/video_library.png" alt="Video Library" width="85%"/>
+</p>
+
+---
+
+###  12. Video Player & Details
+<p align="center">
+  <img src="./docs/screenshots/video_details.png" alt="Video Player" width="85%"/>
+</p>
+
+---
+
 
 ##  User Manual
 
