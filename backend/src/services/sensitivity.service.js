@@ -2,15 +2,7 @@
  * Content Sensitivity Analysis Service.
  *
  * Extracts key frames from a video using FFmpeg, then analyses each frame
- * for sensitive content. Provides real-time progress updates via Socket.io.
- *
- * Strategy: Extract frames at regular intervals, run a simulated sensitivity
- * classifier on each frame, aggregate scores for final classification.
- *
- * NOTE: For production use, replace the simulated classifier with NSFWJS
- * or a cloud vision API (Google Cloud Vision, AWS Rekognition).
- * The pipeline architecture remains the same — only the classifyFrame()
- * function needs to be swapped.
+ * for sensitive content using Google Cloud Vision API.
  */
 const path = require('path');
 const fs = require('fs');
@@ -18,21 +10,6 @@ const ffmpeg = require('fluent-ffmpeg');
 const ffmpegPath = require('@ffmpeg-installer/ffmpeg').path;
 const ffprobePath = require('@ffprobe-installer/ffprobe').path;
 const logger = require('../utils/logger');
-
-let tf;
-let nsfwjs;
-let nsfwModel = null; // Cached model — loaded once, reused for all videos
-let modelLoadFailed = false; // Prevents retrying after a failed load
-
-// Attempt to load TensorFlow (only works on Linux/Render, not Windows without VS Build Tools)
-try {
-  tf = require('@tensorflow/tfjs-node');
-  nsfwjs = require('nsfwjs');
-  logger.info('TensorFlow.js loaded successfully — real AI detection enabled.');
-} catch (e) {
-  logger.warn(`TensorFlow.js failed to load: ${e.message}. Falling back to simulator.`);
-  modelLoadFailed = true;
-}
 
 // Set bundled FFmpeg/FFprobe paths (works on Render, Heroku, etc.)
 ffmpeg.setFfmpegPath(ffmpegPath);
@@ -53,17 +30,10 @@ const analyseVideo = async (videoPath, duration, onProgress) => {
   const framesDir = path.join(path.dirname(videoPath), '..', 'temp_frames');
 
   try {
-    // Load NSFWJS model into memory on first run (cached for subsequent videos)
-    if (!nsfwModel && !modelLoadFailed) {
-      onProgress(5, 'Loading AI content moderation model...');
-      logger.info('Loading NSFWJS model into memory (first upload)...');
-      try {
-        nsfwModel = await nsfwjs.load();
-        logger.info('✅ NSFWJS model loaded successfully.');
-      } catch (modelErr) {
-        logger.error(`Failed to load NSFWJS model: ${modelErr.message}`);
-        modelLoadFailed = true;
-      }
+    if (!process.env.GOOGLE_VISION_API_KEY) {
+      logger.warn('GOOGLE_VISION_API_KEY is not set. Sensitivity analysis will fall back to simulation.');
+    } else {
+      logger.info('Using Google Cloud Vision API for content moderation.');
     }
 
     // Create temporary directory for extracted frames
@@ -94,9 +64,6 @@ const analyseVideo = async (videoPath, duration, onProgress) => {
 
       const result = await classifyFrame(frames[i]);
       frameResults.push(result);
-
-      // Small delay to make progress visible in real-time
-      await new Promise((resolve) => setTimeout(resolve, 300));
     }
 
     onProgress(85, 'Aggregating analysis results...');
@@ -124,8 +91,13 @@ const analyseVideo = async (videoPath, duration, onProgress) => {
         threshold: SENSITIVITY_THRESHOLD,
         frameResults: frameResults.map((r, i) => ({
           frame: i + 1,
-          score: r.score,
-          categories: r.categories,
+          score: Math.round(r.score * 1000) / 1000,
+          categories: {
+            safe: Math.round(r.categories.safe * 1000) / 1000,
+            suggestive: Math.round(r.categories.suggestive * 1000) / 1000,
+            violent: Math.round(r.categories.violent * 1000) / 1000,
+            explicit: Math.round(r.categories.explicit * 1000) / 1000,
+          },
         })),
       },
     };
@@ -138,11 +110,6 @@ const analyseVideo = async (videoPath, duration, onProgress) => {
 
 /**
  * Extract key frames from a video using FFmpeg.
- *
- * @param {string} videoPath - Path to the video file
- * @param {string} outputDir - Directory to save frames
- * @param {number} interval - Seconds between frames
- * @returns {Promise<string[]>} - Array of frame file paths
  */
 const extractFrames = (videoPath, outputDir, interval) => {
   return new Promise((resolve, reject) => {
@@ -152,7 +119,6 @@ const extractFrames = (videoPath, outputDir, interval) => {
       .outputOptions([`-vf fps=1/${interval}`, '-q:v 2', '-frames:v 20'])
       .output(outputPattern)
       .on('end', () => {
-        // Read all extracted frame files
         const frames = fs
           .readdirSync(outputDir)
           .filter((f) => f.startsWith('frame_') && f.endsWith('.jpg'))
@@ -162,7 +128,6 @@ const extractFrames = (videoPath, outputDir, interval) => {
       })
       .on('error', (err) => {
         logger.error(`Frame extraction error: ${err.message}`);
-        // If FFmpeg fails, resolve with empty array (graceful degradation)
         resolve([]);
       })
       .run();
@@ -170,86 +135,101 @@ const extractFrames = (videoPath, outputDir, interval) => {
 };
 
 /**
- * Classify a single frame for sensitive content.
- *
- * Uses NSFWJS (real AI) when TensorFlow is available (Linux/Render).
- * Falls back to a simulator when TensorFlow cannot load (Windows without VS Build Tools).
- *
- * @param {string} framePath - Path to the frame image
- * @returns {Promise<object>} - { score, categories }
+ * Classify a single frame using Google Cloud Vision API.
  */
 const classifyFrame = async (framePath) => {
-  // --- REAL AI PATH (Render/Linux) ---
-  if (nsfwModel && tf) {
-    let imageTensor = null;
-    try {
-      const imageBuffer = fs.readFileSync(framePath);
-      imageTensor = tf.node.decodeImage(imageBuffer, 3);
-      const predictions = await nsfwModel.classify(imageTensor);
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
 
-      let explicitProb = 0;
-      let suggestiveProb = 0;
-      let safeProb = 0;
-
-      predictions.forEach((p) => {
-        if (p.className === 'Porn' || p.className === 'Hentai') {
-          explicitProb += p.probability;
-        } else if (p.className === 'Sexy') {
-          suggestiveProb += p.probability;
-        } else {
-          safeProb += p.probability;
-        }
-      });
-
-      // Explicit content weighted heavier than suggestive
-      const score = explicitProb + (suggestiveProb * 0.5);
-
-      return {
-        score,
-        categories: {
-          safe: safeProb,
-          suggestive: suggestiveProb,
-          violent: 0, // NSFWJS does not detect violence
-          explicit: explicitProb,
-        },
-      };
-    } catch (error) {
-      logger.error(`Frame classification error: ${error.message}`);
-      return { score: 0, categories: { safe: 1, suggestive: 0, violent: 0, explicit: 0 } };
-    } finally {
-      // CRITICAL: Dispose tensor to prevent memory leaks
-      if (imageTensor) imageTensor.dispose();
-    }
+  if (!apiKey) {
+    // Fallback Simulator if no API key is provided
+    const isFlagged = Math.random() > 0.5;
+    const baseScore = isFlagged ? (0.7 + Math.random() * 0.2) : (Math.random() * 0.3); 
+    const noise = Math.random() * 0.1;
+    return {
+      score: baseScore + noise,
+      categories: {
+        safe: 1 - baseScore - noise,
+        suggestive: baseScore * 0.5,
+        violent: baseScore * 0.3,
+        explicit: baseScore * 0.2,
+      },
+    };
   }
 
-  // --- FALLBACK SIMULATOR PATH (Windows/local dev) ---
-  logger.debug('Using simulated classifier (TensorFlow not available).');
-  const baseScore = Math.random() * 0.3;
-  const noise = Math.random() * 0.1;
-  return {
-    score: baseScore + noise,
-    categories: {
-      safe: 1 - baseScore - noise,
-      suggestive: baseScore * 0.5,
-      violent: baseScore * 0.3,
-      explicit: baseScore * 0.2,
-    },
-  };
+  try {
+    const imageBuffer = fs.readFileSync(framePath);
+    const base64Image = imageBuffer.toString('base64');
+
+    const response = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [
+          {
+            image: { content: base64Image },
+            features: [{ type: 'SAFE_SEARCH_DETECTION' }]
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Google API Error: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    const safeSearch = data.responses[0]?.safeSearchAnnotation;
+
+    if (!safeSearch) {
+      throw new Error('No SafeSearch data returned from Google API');
+    }
+
+    // Google returns likelihoods as string enums. We map them to numerical weights.
+    const likelihoodMap = {
+      UNKNOWN: 0.0,
+      VERY_UNLIKELY: 0.05,
+      UNLIKELY: 0.2,
+      POSSIBLE: 0.5,
+      LIKELY: 0.8,
+      VERY_LIKELY: 0.95,
+    };
+
+    const explicitScore = likelihoodMap[safeSearch.adult] || 0;
+    const violenceScore = likelihoodMap[safeSearch.violence] || 0;
+    const suggestiveScore = likelihoodMap[safeSearch.racy] || 0;
+
+    // The frame score is the highest threat level found
+    const score = Math.max(explicitScore, violenceScore, suggestiveScore * 0.7);
+
+    return {
+      score,
+      categories: {
+        safe: 1 - score,
+        suggestive: suggestiveScore,
+        violent: violenceScore,
+        explicit: explicitScore,
+      },
+    };
+  } catch (error) {
+    logger.error(`Frame classification failed: ${error.message}`);
+    // Safe fallback on error
+    return {
+      score: 0,
+      categories: { safe: 1, suggestive: 0, violent: 0, explicit: 0 },
+    };
+  }
 };
 
 /**
  * Cleanup temporary frame files.
- * @param {string} framesDir - Directory containing temp frames
  */
 const cleanupFrames = (framesDir) => {
   try {
     if (fs.existsSync(framesDir)) {
       const files = fs.readdirSync(framesDir);
-      files.forEach((file) => {
-        fs.unlinkSync(path.join(framesDir, file));
-      });
+      files.forEach((file) => fs.unlinkSync(path.join(framesDir, file)));
       fs.rmdirSync(framesDir);
-      logger.debug('Cleaned up temporary frame files');
     }
   } catch (err) {
     logger.warn(`Frame cleanup warning: ${err.message}`);
