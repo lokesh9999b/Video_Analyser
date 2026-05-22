@@ -4,10 +4,19 @@ import { PlayCircle, Clock, ShieldCheck, ShieldAlert, Activity } from 'lucide-re
 import Badge from '../ui/Badge';
 import ProgressBar from '../ui/ProgressBar';
 
+const API_BASE = import.meta.env.VITE_API_URL 
+  ? import.meta.env.VITE_API_URL.replace(/\/api$/, '') 
+  : '';
+
 const VideoCard = ({ video }) => {
   const isCompleted = video.status === 'completed';
   const isFailed = video.status === 'failed';
   const isProcessing = ['uploading', 'processing', 'analysing'].includes(video.status);
+
+  // Construct thumbnail URL based on the backend static route
+  const thumbnailUrl = video.thumbnailPath 
+    ? `${API_BASE}/thumbnails/thumb_${video._id}.jpg`
+    : null;
 
   return (
     <Link to={`/video/${video._id}`} className="group block animate-fade-in">
@@ -15,9 +24,9 @@ const VideoCard = ({ video }) => {
         
         {/* Thumbnail Area */}
         <div className="aspect-video relative bg-slate-950 overflow-hidden">
-          {isCompleted && video.thumbnailUrl ? (
+          {isCompleted && thumbnailUrl ? (
             <img 
-              src={video.thumbnailUrl} 
+              src={thumbnailUrl} 
               alt={video.title} 
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               crossOrigin="anonymous"

@@ -43,6 +43,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved', // Existing users stay active; new join-requests set this to 'pending'
+    },
   },
   {
     timestamps: true,
@@ -56,8 +61,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-// Index for multi-tenant queries
+// Indexes for multi-tenant queries
 userSchema.index({ organisation: 1 });
+userSchema.index({ organisation: 1, status: 1 });
 
 /**
  * Pre-save hook: Hash password before saving.

@@ -1,13 +1,13 @@
 /**
- * Sidebar — side navigation with active state and role-based links.
+ * Sidebar — side navigation with active state, role-based links, and collapse toggle.
  */
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  LayoutDashboard, Upload, Library, Shield, Users
+  LayoutDashboard, Upload, Library, Users, ChevronLeft, ChevronRight,
 } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ open, onToggle }) => {
   const { isEditor, isAdmin } = useAuth();
 
   const linkClass = ({ isActive }) =>
@@ -17,34 +17,56 @@ const Sidebar = () => {
         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent'
     }`;
 
-  const iconClass = ({ isActive }) => 
-    `transition-colors duration-200 ${isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`;
+  const iconClass = ({ isActive }) =>
+    `transition-colors duration-200 shrink-0 ${isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`;
 
   return (
-    <aside className="w-64 min-h-[calc(100vh-65px)] bg-slate-900/40 border-r border-white/5 p-4 flex flex-col gap-2 shrink-0 hidden lg:flex backdrop-blur-xl">
-      <div className="space-y-1 mt-2">
-        <NavLink to="/dashboard" className={linkClass}>
+    <aside
+      className={`
+        relative min-h-[calc(100vh-65px)] bg-slate-900/40 border-r border-white/5
+        flex flex-col shrink-0 hidden lg:flex backdrop-blur-xl
+        transition-all duration-300 ease-in-out overflow-hidden
+        ${open ? 'w-64 p-4' : 'w-16 p-2'}
+      `}
+    >
+      {/* Toggle button */}
+      <div className={`flex items-center ${open ? 'justify-end' : 'justify-center'} mb-6`}>
+        <button
+          onClick={onToggle}
+          title={open ? 'Collapse sidebar' : 'Expand sidebar'}
+          className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-md shrink-0"
+        >
+          {open ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
+      </div>
+
+      {/* Nav links */}
+      <div className="space-y-1">
+        <NavLink to="/dashboard" className={linkClass} title={!open ? 'Dashboard' : undefined}>
           {({ isActive }) => (
             <>
-              <LayoutDashboard size={18} className={iconClass({ isActive })} /> Dashboard
+              <LayoutDashboard size={18} className={iconClass({ isActive })} />
+              {open && <span>Dashboard</span>}
             </>
           )}
         </NavLink>
 
         {isEditor && (
-          <NavLink to="/upload" className={linkClass}>
+          <NavLink to="/upload" className={linkClass} title={!open ? 'Upload Video' : undefined}>
             {({ isActive }) => (
               <>
-                <Upload size={18} className={iconClass({ isActive })} /> Upload Video
+                <Upload size={18} className={iconClass({ isActive })} />
+                {open && <span>Upload Video</span>}
               </>
             )}
           </NavLink>
         )}
 
-        <NavLink to="/library" className={linkClass}>
+        <NavLink to="/library" className={linkClass} title={!open ? 'Video Library' : undefined}>
           {({ isActive }) => (
             <>
-              <Library size={18} className={iconClass({ isActive })} /> Video Library
+              <Library size={18} className={iconClass({ isActive })} />
+              {open && <span>Video Library</span>}
             </>
           )}
         </NavLink>
@@ -53,33 +75,23 @@ const Sidebar = () => {
       {isAdmin && (
         <>
           <div className="my-3 border-t border-white/5 mx-2" />
-          <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-            Administration
-          </p>
+          {open && (
+            <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              Administration
+            </p>
+          )}
           <div className="space-y-1">
-            <NavLink to="/admin" className={linkClass}>
+            <NavLink to="/admin" className={linkClass} title={!open ? 'Manage Users' : undefined}>
               {({ isActive }) => (
                 <>
-                  <Users size={18} className={iconClass({ isActive })} /> Manage Users
+                  <Users size={18} className={iconClass({ isActive })} />
+                  {open && <span>Manage Users</span>}
                 </>
               )}
             </NavLink>
           </div>
         </>
       )}
-
-      {/* Bottom card */}
-      <div className="mt-auto mx-1 p-4 rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/80 border border-white/5 shadow-inner">
-        <div className="flex items-center gap-2.5 mb-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-            <Shield size={16} className="text-indigo-400" />
-          </div>
-          <span className="text-sm font-semibold text-slate-200">Pulse Pro</span>
-        </div>
-        <p className="text-xs text-slate-400 leading-relaxed">
-          AI-powered content moderation is currently active for your workspace.
-        </p>
-      </div>
     </aside>
   );
 };

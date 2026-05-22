@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Film, ArrowRight, Shield, Zap } from 'lucide-react';
+import { Mail, Lock, Film, ArrowRight, Shield, Zap, Building2, UserPlus } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
 import toast from 'react-hot-toast';
@@ -22,7 +22,14 @@ const LoginPage = () => {
       await login(formData);
       navigate('/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      const status = err.response?.data?.status;
+      if (status === 'pending') {
+        toast('Your account is awaiting admin approval.', { icon: '⏳' });
+      } else if (status === 'rejected') {
+        toast.error('Your access request was rejected. Contact your org admin.');
+      } else {
+        toast.error(err.response?.data?.message || 'Login failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,7 +66,7 @@ const LoginPage = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold text-white">Instant Transcoding</h3>
-                  <p className="text-sm">HLS & MP4 formats optimized for every device.</p>
+                  <p className="text-sm">HLS &amp; MP4 formats optimized for every device.</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 text-slate-300">
@@ -77,10 +84,10 @@ const LoginPage = () => {
       </div>
 
       {/* Right Panel - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12 relative overflow-y-auto">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-[128px] pointer-events-none" />
-        
-        <div className="w-full max-w-md animate-fade-in relative z-10">
+
+        <div className="w-full max-w-md animate-fade-in relative z-10 py-8">
           <div className="text-center lg:text-left mb-10">
             <h2 className="text-3xl font-bold mb-2">Welcome back</h2>
             <p className="text-slate-400">Sign in to your workspace to continue.</p>
@@ -94,6 +101,7 @@ const LoginPage = () => {
                   <Mail size={18} />
                 </div>
                 <input
+                  id="login-email"
                   type="email"
                   name="email"
                   value={formData.email}
@@ -112,6 +120,7 @@ const LoginPage = () => {
                   <Lock size={18} />
                 </div>
                 <input
+                  id="login-password"
                   type="password"
                   name="password"
                   value={formData.password}
@@ -124,18 +133,49 @@ const LoginPage = () => {
             </div>
 
             <div className="pt-2">
-              <Button type="submit" fullWidth size="lg" loading={loading}>
+              <Button id="login-submit" type="submit" fullWidth size="lg" loading={loading}>
                 Sign In <ArrowRight size={18} />
               </Button>
             </div>
           </form>
 
-          <p className="text-center text-sm text-slate-400 mt-8">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-              Create workspace
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-8">
+            <div className="flex-1 h-px bg-slate-800" />
+            <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">New to Pulse?</span>
+            <div className="flex-1 h-px bg-slate-800" />
+          </div>
+
+          {/* Two Registration Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Link
+              id="cta-join-org"
+              to="/register/user"
+              className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-slate-700 bg-slate-900/60 hover:border-indigo-500/60 hover:bg-indigo-500/5 transition-all duration-200"
+            >
+              <div className="w-8 h-8 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:bg-indigo-500/20 transition-colors">
+                <UserPlus size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Join an Organisation</p>
+                <p className="text-xs text-slate-400 mt-0.5">Request access to your team's workspace</p>
+              </div>
             </Link>
-          </p>
+
+            <Link
+              id="cta-register-org"
+              to="/register/org"
+              className="group flex flex-col items-start gap-2 p-4 rounded-xl border border-slate-700 bg-slate-900/60 hover:border-cyan-500/60 hover:bg-cyan-500/5 transition-all duration-200"
+            >
+              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400 group-hover:bg-cyan-500/20 transition-colors">
+                <Building2 size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-white">Register Organisation</p>
+                <p className="text-xs text-slate-400 mt-0.5">Set up your company's workspace</p>
+              </div>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
  * Manages user state, JWT tokens, login/register/logout flows.
  */
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { loginUser, registerUser, getMe } from '../api/auth.api';
+import { loginUser, registerOrg, registerUserJoin, getMe } from '../api/auth.api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
@@ -52,15 +52,29 @@ export const AuthProvider = ({ children }) => {
     return userData;
   }, []);
 
-  const register = useCallback(async (data) => {
-    const res = await registerUser(data);
+  /**
+   * Register a NEW organisation.
+   * The registering user becomes the admin and is logged in immediately.
+   */
+  const registerOrganisation = useCallback(async (data) => {
+    const res = await registerOrg(data);
     const { user: userData, token: newToken } = res.data.data;
     localStorage.setItem('pulse_token', newToken);
     localStorage.setItem('pulse_user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
-    toast.success('Account created successfully!');
+    toast.success(`Organisation "${userData.organisation}" created! You are now the admin.`);
     return userData;
+  }, []);
+
+  /**
+   * Submit a join request to an existing organisation.
+   * Returns { pending: true } — the user is NOT logged in.
+   */
+  const requestToJoinOrg = useCallback(async (data) => {
+    const res = await registerUserJoin(data);
+    // No token returned — just surface the pending state to the page
+    return { pending: true, message: res.data.message, data: res.data.data };
   }, []);
 
   const logout = useCallback(() => {
@@ -77,7 +91,18 @@ export const AuthProvider = ({ children }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, register, logout, isAdmin, isEditor, isViewer }}
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        registerOrganisation,
+        requestToJoinOrg,
+        logout,
+        isAdmin,
+        isEditor,
+        isViewer,
+      }}
     >
       {children}
     </AuthContext.Provider>
