@@ -19,6 +19,7 @@ const Video = require('../models/Video');
 const { analyseVideo } = require('./sensitivity.service');
 const { emitToUser } = require('../config/socket');
 const { VIDEO_STATUS } = require('../utils/helpers');
+const { clearCacheForOrg } = require('../utils/cache');
 const logger = require('../utils/logger');
 
 // Set bundled FFmpeg/FFprobe paths (works on Render, Heroku, etc.)
@@ -119,9 +120,10 @@ const processVideo = async (videoId, userId) => {
     // ───────────────────────────────────────────
     emitProgress(VIDEO_STATUS.PROCESSING, 85, 'Optimising video for streaming...');
 
-    const processedPath = await transcodeVideo(filePath, videoId);
+    const qualities = await transcodeVideo(filePath, videoId);
     await Video.findByIdAndUpdate(videoId, {
-      processedPath,
+      processedPath: qualities['720p'] || qualities['360p'] || qualities['original'], // Default playback
+      qualities,
       processingProgress: 95,
     });
 
@@ -219,12 +221,12 @@ const generateThumbnail = (filePath, videoId) => {
 };
 
 /**
- * Transcode video to streaming-optimised MP4 (H.264 + AAC).
+ * Transcode video to multiple streaming-optimised qualities (720p, 360p).
  * Uses faststart for progressive download.
  *
  * @param {string} filePath - Path to the original video
  * @param {string} videoId - Video document ID (for naming)
- * @returns {Promise<string>} - Path to the processed video
+ * @returns {Promise<object>} - Map of qualities to file paths
  */
 const transcodeVideo = (filePath, videoId) => {
   return new Promise((resolve, reject) => {
@@ -233,56 +235,42 @@ const transcodeVideo = (filePath, videoId) => {
       fs.mkdirSync(processedDir, { recursive: true });
     }
 
-    const outputPath = path.join(processedDir, `${videoId}_processed.mp4`);
+    const path720p = path.join(processedDir, `${videoId}_720p.mp4`);
+    const path360p = path.join(processedDir, `${videoId}_360p.mp4`);
+    const fallbackPath = path.join(processedDir, `${videoId}_original.mp4`);
 
-    // Check if the input is already an MP4 with H.264 — skip transcoding
-    ffmpeg.ffprobe(filePath, (err, metadata) => {
-      if (err) {
-        logger.warn(`FFprobe failed during transcode check, copying file instead`);
-        // Just copy the file as a fallback
-        fs.copyFileSync(filePath, outputPath);
-        return resolve(outputPath);
-      }
-
-      const videoStream = metadata.streams.find((s) => s.codec_type === 'video');
-      const isAlreadyOptimised =
-        videoStream &&
-        videoStream.codec_name === 'h264' &&
-        path.extname(filePath).toLowerCase() === '.mp4';
-
-      if (isAlreadyOptimised) {
-        // Already optimised — just copy with faststart
-        ffmpeg(filePath)
-          .outputOptions(['-c copy', '-movflags +faststart'])
-          .output(outputPath)
-          .on('end', () => resolve(outputPath))
-          .on('error', (err) => {
-            logger.warn(`Faststart copy failed: ${err.message}, copying raw`);
-            fs.copyFileSync(filePath, outputPath);
-            resolve(outputPath);
-          })
-          .run();
-      } else {
-        // Full transcode to H.264 + AAC
-        ffmpeg(filePath)
-          .videoCodec('libx264')
-          .audioCodec('aac')
-          .outputOptions([
-            '-preset fast',
-            '-crf 23',
-            '-movflags +faststart',
-            '-pix_fmt yuv420p',
-          ])
-          .output(outputPath)
-          .on('end', () => resolve(outputPath))
-          .on('error', (err) => {
-            logger.warn(`Transcoding failed: ${err.message}, copying raw`);
-            fs.copyFileSync(filePath, outputPath);
-            resolve(outputPath);
-          })
-          .run();
-      }
-    });
+    // Run a multi-output FFmpeg command
+    ffmpeg(filePath)
+      // 720p Output
+      .output(path720p)
+      .size('?x720')
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .outputOptions(['-preset fast', '-crf 28', '-movflags +faststart'])
+      
+      // 360p Output
+      .output(path360p)
+      .size('?x360')
+      .videoCodec('libx264')
+      .audioCodec('aac')
+      .outputOptions(['-preset fast', '-crf 28', '-movflags +faststart'])
+      
+      .on('end', () => {
+        resolve({
+          '720p': path720p,
+          '360p': path360p,
+        });
+      })
+      .on('error', (err) => {
+        logger.warn(`Transcoding failed: ${err.message}, falling back to raw copy`);
+        try {
+          fs.copyFileSync(filePath, fallbackPath);
+          resolve({ original: fallbackPath });
+        } catch (copyErr) {
+          reject(copyErr);
+        }
+      })
+      .run();
   });
 };
 
@@ -290,10 +278,14 @@ const transcodeVideo = (filePath, videoId) => {
  * Update video status and progress in the database.
  */
 const updateVideoStatus = async (videoId, status, progress) => {
-  await Video.findByIdAndUpdate(videoId, {
+  const video = await Video.findByIdAndUpdate(videoId, {
     status,
     processingProgress: progress,
-  });
+  }, { new: true });
+  
+  if (video) {
+    clearCacheForOrg(video.organisation);
+  }
 };
 
 module.exports = { processVideo };

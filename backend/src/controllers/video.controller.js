@@ -8,6 +8,7 @@ const Video = require('../models/Video');
 const { processVideo } = require('../services/processing.service');
 const { streamVideo } = require('../services/streaming.service');
 const { VIDEO_STATUS, SENSITIVITY } = require('../utils/helpers');
+const { clearCacheForOrg } = require('../utils/cache');
 const logger = require('../utils/logger');
 
 /**
@@ -55,6 +56,9 @@ const uploadVideo = async (req, res, next) => {
     processVideo(video._id.toString(), req.user._id.toString()).catch((err) => {
       logger.error(`Background processing error for ${video._id}: ${err.message}`);
     });
+
+    // Clear cache so the new video appears immediately in lists and stats
+    clearCacheForOrg(req.user.organisation);
 
     res.status(201).json({
       success: true,
@@ -221,6 +225,9 @@ const deleteVideo = async (req, res, next) => {
 
     logger.info(`Video deleted: ${video._id} by user ${req.user._id}`);
 
+    // Clear cache so the deleted video disappears immediately from lists and stats
+    clearCacheForOrg(req.user.organisation);
+
     res.status(200).json({
       success: true,
       message: 'Video deleted successfully.',
@@ -248,8 +255,14 @@ const stream = async (req, res, next) => {
       });
     }
 
-    // Use processed file if available, otherwise use original
-    const filePath = video.processedPath || video.filePath;
+    const { quality } = req.query;
+
+    let filePath = video.processedPath || video.filePath;
+
+    // Use requested quality if available
+    if (quality && video.qualities && video.qualities.get(quality)) {
+      filePath = video.qualities.get(quality);
+    }
 
     if (!filePath || !fs.existsSync(filePath)) {
       return res.status(404).json({

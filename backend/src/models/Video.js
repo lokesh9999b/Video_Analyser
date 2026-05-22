@@ -30,6 +30,11 @@ const videoSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    qualities: {
+      type: Map,
+      of: String,
+      default: {},
+    },
     thumbnailPath: {
       type: String,
       default: null,

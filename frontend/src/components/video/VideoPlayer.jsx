@@ -12,6 +12,11 @@ const VideoPlayer = ({ video }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showControls, setShowControls] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState('');
+
+  // Extract available qualities from the video object if they exist
+  const availableQualities = video.qualities ? Object.keys(video.qualities) : [];
 
   // Auto-hide controls
   useEffect(() => {
@@ -76,7 +81,13 @@ const VideoPlayer = ({ video }) => {
   // typically streaming requires a ticket or query param auth if the token is not in a cookie.
   // For simplicity in this demo, we assume the backend handles stream auth or we pass token.
   const token = localStorage.getItem('pulse_token');
-  const streamUrl = `${api.defaults.baseURL}/videos/${video._id}/stream${token ? `?token=${token}` : ''}`;
+  const streamUrl = `${api.defaults.baseURL}/videos/${video._id}/stream?token=${token || ''}${selectedQuality ? `&quality=${selectedQuality}` : ''}`;
+
+  const handleQualityChange = (quality) => {
+    setSelectedQuality(quality);
+    setShowSettings(false);
+    // When quality changes, the video src will update. We should maintain play state.
+  };
 
   return (
     <div 
@@ -142,10 +153,35 @@ const VideoPlayer = ({ video }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button className="text-white hover:text-indigo-400 transition-colors">
+          <div className="flex items-center gap-4 relative">
+            <button 
+              onClick={() => setShowSettings(!showSettings)}
+              className="text-white hover:text-indigo-400 transition-colors"
+            >
               <Settings size={20} />
             </button>
+
+            {/* Quality Settings Dropdown */}
+            {showSettings && availableQualities.length > 0 && (
+              <div className="absolute bottom-10 right-8 bg-[#111115] border border-white/10 rounded-lg py-2 min-w-[120px] z-50 shadow-xl backdrop-blur-md">
+                <div className="px-4 py-1 text-xs text-white/50 font-semibold mb-1 border-b border-white/5">Quality</div>
+                <button 
+                  onClick={() => handleQualityChange('')}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 transition-colors ${!selectedQuality ? 'text-indigo-400 font-medium' : 'text-white'}`}
+                >
+                  Auto
+                </button>
+                {availableQualities.map(q => (
+                  <button 
+                    key={q}
+                    onClick={() => handleQualityChange(q)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-white/5 transition-colors ${selectedQuality === q ? 'text-indigo-400 font-medium' : 'text-white'}`}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
             <button onClick={toggleFullScreen} className="text-white hover:text-indigo-400 transition-colors">
               <Maximize size={20} />
             </button>

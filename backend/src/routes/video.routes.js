@@ -21,18 +21,21 @@ const {
   stream,
   getStats,
 } = require('../controllers/video.controller');
+const { cacheMiddleware } = require('../utils/cache');
 
 // All routes require authentication
 router.use(auth);
 
 // Stats endpoint (must be before /:id to avoid route conflict)
-router.get('/stats', getStats);
+// Cache stats for 1 minute
+router.get('/stats', cacheMiddleware(60), getStats);
 
 // Upload — only editors and admins
 router.post('/upload', authorize('editor', 'admin'), upload.single('video'), uploadVideo);
 
 // List and detail — all authenticated users
-router.get('/', getVideos);
+// Cache list for 1 minute
+router.get('/', cacheMiddleware(60), getVideos);
 router.get('/:id', getVideo);
 
 // Delete — editors (own) and admins (any)
