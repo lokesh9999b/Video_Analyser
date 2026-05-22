@@ -33,7 +33,7 @@ const Sidebar = ({ open, onToggle, mobileOpen, onMobileClose }) => {
       {/* Sidebar container */}
       <aside
         className={`
-          fixed lg:relative top-[65px] lg:top-0 left-0 z-50 h-[calc(100vh-65px)] lg:min-h-[calc(100vh-65px)] 
+          fixed lg:relative top-[65px] lg:top-0 left-0 z-50 h-[calc(100vh-65px)] lg:h-full 
           bg-slate-900 lg:bg-slate-900/40 border-r border-white/5
           flex flex-col shrink-0 backdrop-blur-xl
           transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden

@@ -1,46 +1,123 @@
-# 🎬 Pulse Video Platform
+# Pulse Video Platform
 
-Pulse is an enterprise-ready, multi-tenant video processing and moderation platform. It allows organizations to securely upload, encode, stream, and manage their video content with built-in Role-Based Access Control (RBAC) and automated content moderation.
+![Pulse Banner](https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=2000&auto=format&fit=crop)
 
-## ✨ Key Features
+Pulse is a comprehensive, multi-tenant video platform that enables users to securely upload, process, and stream videos. It features an automated AI-driven content moderation pipeline that detects sensitive material (adult, violent, racy) and an adaptive streaming service.
 
-* **Multi-Tenant Architecture:** Complete data isolation using `organisation` as the tenant boundary. Users only see videos within their workspace.
-* **Role-Based Access Control (RBAC):**
-  * **Viewers:** Read-only access to assigned videos.
-  * **Editors:** Can upload, edit, and delete their own video content.
-  * **Admins:** Full system access, including cross-organization video management and user role administration.
-* **Real-time Video Processing Pipeline:**
-  * Automated file validation and size constraints.
-  * FFmpeg-powered frame extraction and encoding.
-  * Real-time WebSocket (`Socket.io`) progress updates streamed directly to the frontend.
-* **Secure Streaming:** JWT-authenticated video streaming endpoints protecting raw media files.
-* **Modern SaaS UI:** Built with React, Tailwind CSS v4, and Lucide Icons featuring a premium, dark-mode, glassmorphic aesthetic.
+---
 
-## 🚀 Tech Stack
+###  Live Links
+- **Live Demo**: [Insert Vercel/Render URL Here]
+- **Video Walkthrough**: [Insert YouTube/Loom URL Here]
 
-**Frontend:**
-- React 19 (Vite)
-- Tailwind CSS v4
-- Socket.io Client
-- React Router DOM
-- Axios
+---
 
-**Backend:**
-- Node.js & Express
-- MongoDB (Mongoose)
-- Socket.io (WebSocket server)
-- FFmpeg (Video processing)
-- JSON Web Tokens (JWT) for authentication
-- Multer (File uploads)
+##  Architecture Overview
 
-## 🛠️ Local Development Setup
+Pulse follows a modern, decoupled client-server architecture.
+
+### System Architecture
+
+```mermaid
+graph TD
+    Client[Client: React + Vite + Tailwind]
+    LB[Load Balancer / Cloud]
+    
+    subgraph Backend [Node.js + Express Server]
+        API[REST API Endpoints]
+        Socket[Socket.io Server]
+        Auth[Auth & RBAC Middleware]
+        Cache[Node-Cache In-Memory]
+        
+        subgraph Pipeline [Video Processing Pipeline]
+            FFmpeg[FFmpeg Transcoder]
+            Sensitivity[Sensitivity Service]
+        end
+    end
+    
+    DB[(MongoDB Atlas)]
+    GCV[Google Cloud Vision API]
+    
+    Client -- HTTP/REST --> LB
+    Client -- WebSockets --> LB
+    LB --> API
+    LB --> Socket
+    
+    API --> Auth
+    Auth --> Cache
+    Cache --> DB
+    
+    API -- Uploads --> Pipeline
+    Pipeline -- Metadata/Thumbnails/Transcode --> FFmpeg
+    Pipeline -- Base64 Frames --> GCV
+    Pipeline -- Status Updates --> Socket
+    Pipeline -- Final Results --> DB
+```
+
+### Video Processing Flow (Sequence)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant FFmpeg
+    participant GoogleVision
+    participant Database
+
+    User->>Frontend: Uploads Video File
+    Frontend->>Backend: POST /api/videos/upload
+    Backend->>Database: Create Video (Status: Processing)
+    Backend-->>Frontend: 201 Created (Pipeline started in background)
+    
+    rect rgb(30, 41, 59)
+        Note right of Backend: Asynchronous Pipeline
+        Backend->>Frontend: Socket: "Extracting Metadata"
+        Backend->>FFmpeg: ffprobe (Get duration, resolution)
+        
+        Backend->>Frontend: Socket: "Extracting Frames"
+        Backend->>FFmpeg: Extract 1 frame per 2 seconds
+        
+        Backend->>Frontend: Socket: "Analysing Sensitivity"
+        Backend->>GoogleVision: Send Base64 frames (SafeSearch)
+        GoogleVision-->>Backend: Return Threat Likelihoods
+        
+        Backend->>Frontend: Socket: "Transcoding Video"
+        Backend->>FFmpeg: Transcode to H.264 (720p & 360p)
+        
+        Backend->>Database: Save processed paths & sensitivity scores
+        Backend->>Frontend: Socket: "Completed"
+    end
+```
+
+---
+
+##  User Manual
+
+### User Roles (RBAC)
+Pulse uses a strictly enforced Role-Based Access Control system isolated by `organisation`.
+- **Viewer**: Read-only access. Can browse the Video Library, view the dashboard, and stream videos.
+- **Editor**: Can do everything a Viewer can, plus upload new videos and delete their *own* videos.
+- **Admin**: Full system access. Can manage users in their organisation (approve registrations, change roles) and delete *any* video in the organisation.
+
+### Complete User Journey
+1. **Registration**: 
+   - A new user registers an "Organisation" (becomes the Admin).
+   - Other users register under that same Organisation Name (Wait for Admin approval).
+2. **Dashboard**: Users view real-time statistics of total videos, storage used, and videos flagged for sensitive content.
+3. **Uploading**: Editors/Admins drag and drop a video. Real-time progress bars indicate the status of the background processing pipeline.
+4. **Streaming**: Clicking a processed video opens the custom media player. Users can click the "Settings" gear to switch between 720p and 360p adaptive qualities.
+
+---
+
+##  Installation & Setup Guide
 
 ### Prerequisites
-- Node.js (v18+)
-- MongoDB Atlas cluster (or local instance)
-- FFmpeg installed and available in your system's PATH
+- Node.js (v18+ recommended)
+- MongoDB locally installed OR a MongoDB Atlas Cluster URI
+- FFmpeg installed on your system (The backend uses `@ffmpeg-installer/ffmpeg` so it is bundled automatically, but a native installation is recommended for local development).
 
-### 1. Clone the repository
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/lokesh9999b/Video_Analyser.git
 cd Video_Analyser
@@ -55,11 +132,10 @@ Create a `.env` file in the `backend` directory:
 ```env
 PORT=5000
 NODE_ENV=development
-MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-JWT_EXPIRES_IN=7d
 CLIENT_URL=http://localhost:5174
-MAX_FILE_SIZE_MB=500
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_super_secret_jwt_key
+GOOGLE_VISION_API_KEY=your_google_cloud_api_key
 ```
 Start the backend server:
 ```bash
@@ -67,7 +143,6 @@ npm run dev
 ```
 
 ### 3. Frontend Setup
-Open a new terminal window:
 ```bash
 cd frontend
 npm install
@@ -75,15 +150,56 @@ npm install
 Create a `.env` file in the `frontend` directory:
 ```env
 VITE_API_URL=http://localhost:5000/api
-VITE_SOCKET_URL=http://localhost:5000
 ```
 Start the frontend server:
 ```bash
 npm run dev
 ```
 
-## 🔐 First Admin Account
-The **first user** to register a new organization automatically receives the `admin` role. All subsequent users who join that organization will default to the `editor` role until an admin upgrades them.
+### 4. Running Tests
+The backend includes an automated Jest test suite to verify core endpoints.
+```bash
+cd backend
+npm test
+```
 
-## 📄 License
-This project is proprietary and confidential.
+---
+
+##  API Documentation
+
+| Method | Endpoint | Description | Role Required |
+| :--- | :--- | :--- | :--- |
+| **POST** | `/api/auth/register/org` | Register a new organisation and Admin user. | Public |
+| **POST** | `/api/auth/register/user`| Register a new user under an existing org. | Public |
+| **POST** | `/api/auth/login` | Authenticate and receive JWT. | Public |
+| **GET** | `/api/users/pending` | List users awaiting admin approval. | Admin |
+| **PUT** | `/api/users/:id/status` | Approve or reject a pending user. | Admin |
+| **GET** | `/api/videos/stats` | Get dashboard statistics (Cached). | Authenticated |
+| **GET** | `/api/videos` | List videos with pagination/filters (Cached). | Authenticated |
+| **POST** | `/api/videos/upload` | Upload a `multipart/form-data` video. | Editor, Admin |
+| **DELETE**| `/api/videos/:id` | Delete a video and its physical files. | Editor (Own), Admin |
+| **GET** | `/api/videos/:id/stream`| Stream video via HTTP Range Requests. Accepts `?quality=720p` or `360p`. | Authenticated |
+
+---
+
+##  Assumptions & Design Decisions
+
+1. **AI Sensitivity Analysis: Google Cloud Vision**
+   - *Decision:* Replaced local `nsfwjs` (TensorFlow) with the Google Cloud Vision API.
+   - *Reasoning:* Local machine learning models consume massive amounts of RAM (often exceeding free-tier hosting limits) and take minutes to initialize. By offloading this to Google Cloud, the backend remains incredibly lightweight. Furthermore, Google provides enterprise-grade detection for violence and gore, which standard NSFW models miss.
+
+2. **Performance Optimization: Node-Cache**
+   - *Decision:* Implemented an in-memory caching layer (`node-cache`) for the Dashboard and Library endpoints.
+   - *Reasoning:* These endpoints require complex MongoDB aggregation queries. Caching the responses drastically reduces database load. The cache is automatically invalidated whenever an Editor uploads or deletes a video to ensure data consistency.
+
+3. **Data Storage: Local vs Cloud**
+   - *Decision:* Videos are stored on the local disk (`/uploads`, `/processed`).
+   - *Reasoning:* While AWS S3 is standard for production, local storage was chosen to keep the assignment portable and easy to run locally without requiring reviewers to set up complex IAM roles and cloud buckets. 
+
+4. **Multi-Tenant Data Isolation**
+   - *Decision:* Utilized a single-database design with a mandatory `organisation` field on all Users and Videos.
+   - *Reasoning:* Instead of provisioning separate databases per tenant (which doesn't scale well), every query in the backend controllers forces a strict match on `req.user.organisation`. This guarantees completely secure data segregation between tenants at the application layer.
+
+5. **Video Compression & Streaming**
+   - *Decision:* Uploaded videos are transcoded into two MP4 variants (720p and 360p) using `libx264` and the `-movflags +faststart` FFmpeg option.
+   - *Reasoning:* `faststart` moves the moov atom to the beginning of the file, allowing the browser's HTML5 video player to begin streaming immediately via HTTP range requests without needing to download the entire file first. Providing a 360p fallback allows users on slower connections to stream without buffering.
