@@ -7,7 +7,7 @@ Pulse is a comprehensive, multi-tenant video platform that enables users to secu
 ---
 
 ###  Live Links
-- **Live Demo**: https://video-analyser-phi.vercel.app/
+- **Live Demo**: https://video-analyser-pulse.vercel.app/login
 
 ---
 
