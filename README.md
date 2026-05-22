@@ -1,6 +1,6 @@
 # Pulse Video Platform
 
-![Pulse Banner](https://images.unsplash.com/photo-1611162617474-5b21e879e113?q=80&w=2000&auto=format&fit=crop)
+![Pulse Banner](./Banner.png)
 
 Pulse is a comprehensive, multi-tenant video platform that enables users to securely upload, process, and stream videos. It features an automated AI-driven content moderation pipeline that detects sensitive material (adult, violent, racy) and an adaptive streaming service.
 
