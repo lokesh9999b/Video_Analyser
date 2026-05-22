@@ -4,10 +4,10 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
-  LayoutDashboard, Upload, Library, Users, ChevronLeft, ChevronRight,
+  LayoutDashboard, Upload, Library, Users, ChevronLeft, ChevronRight, X
 } from 'lucide-react';
 
-const Sidebar = ({ open, onToggle }) => {
+const Sidebar = ({ open, onToggle, mobileOpen, onMobileClose }) => {
   const { isEditor, isAdmin } = useAuth();
 
   const linkClass = ({ isActive }) =>
@@ -21,52 +21,73 @@ const Sidebar = ({ open, onToggle }) => {
     `transition-colors duration-200 shrink-0 ${isActive ? 'text-indigo-400' : 'text-slate-500 group-hover:text-slate-400'}`;
 
   return (
-    <aside
-      className={`
-        relative min-h-[calc(100vh-65px)] bg-slate-900/40 border-r border-white/5
-        flex flex-col shrink-0 hidden lg:flex backdrop-blur-xl
-        transition-all duration-300 ease-in-out overflow-hidden
-        ${open ? 'w-64 p-4' : 'w-16 p-2'}
-      `}
-    >
-      {/* Toggle button */}
-      <div className={`flex items-center ${open ? 'justify-end' : 'justify-center'} mb-6`}>
+    <>
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity" 
+          onClick={onMobileClose} 
+        />
+      )}
+
+      {/* Sidebar container */}
+      <aside
+        className={`
+          fixed lg:relative top-[65px] lg:top-0 left-0 z-50 h-[calc(100vh-65px)] lg:min-h-[calc(100vh-65px)] 
+          bg-slate-900 lg:bg-slate-900/40 border-r border-white/5
+          flex flex-col shrink-0 backdrop-blur-xl
+          transition-all duration-300 ease-in-out overflow-y-auto overflow-x-hidden
+          ${mobileOpen ? 'translate-x-0 w-64 p-4 shadow-2xl' : '-translate-x-full lg:translate-x-0'}
+          ${open && !mobileOpen ? 'lg:w-64 lg:p-4' : ''}
+          ${!open && !mobileOpen ? 'lg:w-16 lg:p-2' : ''}
+          lg:flex
+        `}
+      >
+      {/* Toggle button (Desktop only) / Close button (Mobile only) */}
+      <div className={`flex items-center ${open || mobileOpen ? 'justify-end' : 'justify-center'} mb-6`}>
         <button
           onClick={onToggle}
           title={open ? 'Collapse sidebar' : 'Expand sidebar'}
-          className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-md shrink-0"
+          className="hidden lg:flex w-7 h-7 items-center justify-center rounded-lg bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shadow-md shrink-0"
         >
           {open ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
+        
+        <button
+          onClick={onMobileClose}
+          className="flex lg:hidden w-8 h-8 items-center justify-center rounded-lg bg-slate-800 border border-white/10 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        >
+          <X size={16} />
         </button>
       </div>
 
       {/* Nav links */}
       <div className="space-y-1">
-        <NavLink to="/dashboard" className={linkClass} title={!open ? 'Dashboard' : undefined}>
+        <NavLink to="/dashboard" onClick={onMobileClose} className={linkClass} title={!open && !mobileOpen ? 'Dashboard' : undefined}>
           {({ isActive }) => (
             <>
               <LayoutDashboard size={18} className={iconClass({ isActive })} />
-              {open && <span>Dashboard</span>}
+              {(open || mobileOpen) && <span>Dashboard</span>}
             </>
           )}
         </NavLink>
 
         {isEditor && (
-          <NavLink to="/upload" className={linkClass} title={!open ? 'Upload Video' : undefined}>
+          <NavLink to="/upload" onClick={onMobileClose} className={linkClass} title={!open && !mobileOpen ? 'Upload Video' : undefined}>
             {({ isActive }) => (
               <>
                 <Upload size={18} className={iconClass({ isActive })} />
-                {open && <span>Upload Video</span>}
+                {(open || mobileOpen) && <span>Upload Video</span>}
               </>
             )}
           </NavLink>
         )}
 
-        <NavLink to="/library" className={linkClass} title={!open ? 'Video Library' : undefined}>
+        <NavLink to="/library" onClick={onMobileClose} className={linkClass} title={!open && !mobileOpen ? 'Video Library' : undefined}>
           {({ isActive }) => (
             <>
               <Library size={18} className={iconClass({ isActive })} />
-              {open && <span>Video Library</span>}
+              {(open || mobileOpen) && <span>Video Library</span>}
             </>
           )}
         </NavLink>
@@ -75,17 +96,17 @@ const Sidebar = ({ open, onToggle }) => {
       {isAdmin && (
         <>
           <div className="my-3 border-t border-white/5 mx-2" />
-          {open && (
+          {(open || mobileOpen) && (
             <p className="px-4 pb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Administration
             </p>
           )}
           <div className="space-y-1">
-            <NavLink to="/admin" className={linkClass} title={!open ? 'Manage Users' : undefined}>
+            <NavLink to="/admin" onClick={onMobileClose} className={linkClass} title={!open && !mobileOpen ? 'Manage Users' : undefined}>
               {({ isActive }) => (
                 <>
                   <Users size={18} className={iconClass({ isActive })} />
-                  {open && <span>Manage Users</span>}
+                  {(open || mobileOpen) && <span>Manage Users</span>}
                 </>
               )}
             </NavLink>
@@ -93,6 +114,7 @@ const Sidebar = ({ open, onToggle }) => {
         </>
       )}
     </aside>
+    </>
   );
 };
 

@@ -6,10 +6,10 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import {
-  LogOut, User, Settings, ChevronDown, Wifi, WifiOff, Film
+  LogOut, User, Settings, ChevronDown, Wifi, WifiOff, Film, Menu
 } from 'lucide-react';
 
-const Navbar = () => {
+const Navbar = ({ onMenuClick }) => {
   const { user, logout, isAdmin } = useAuth();
   const { connected } = useSocket();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,13 +34,21 @@ const Navbar = () => {
 
   return (
     <nav className="glass sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between border-b border-white/5">
-      {/* Logo */}
-      <Link to="/dashboard" className="flex items-center gap-3 group">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow">
-          <Film size={18} className="text-white" />
-        </div>
-        <span className="text-xl font-bold tracking-tight text-white">Pulse</span>
-      </Link>
+      {/* Logo Area */}
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onMenuClick}
+          className="p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 lg:hidden transition-colors"
+        >
+          <Menu size={24} />
+        </button>
+        <Link to="/dashboard" className="flex items-center gap-3 group">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20 group-hover:shadow-indigo-500/40 transition-shadow">
+            <Film size={18} className="text-white" />
+          </div>
+          <span className="text-xl font-bold tracking-tight text-white hidden sm:block">Pulse</span>
+        </Link>
+      </div>
 
       {/* Right side */}
       <div className="flex items-center gap-5">
